@@ -1,4 +1,7 @@
 {
+  "version": 1,
+  "updatedAt": null,
+
   "areas": [
     {
       "id": "hokkaido",
@@ -189,5 +192,14 @@
       "name": "沖縄県"
     }
   ],
-  "elections": []
+
+  "municipalities": [],
+
+  "elections": [],
+
+  "candidates": [],
+
+  "sources": [],
+
+  "ingestionRuns": []
 }
