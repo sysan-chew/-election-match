@@ -1,4 +1,4 @@
-import data from "../../../../data/elections.json";
+imporimport data from "../../../data/elections.json";
 
 export async function POST(request) {
   try {
