@@ -1,4 +1,4 @@
-imporimport data from "../../../data/elections.json";
+import data from "../../../data/elections.json";
 
 export async function POST(request) {
   try {
@@ -26,22 +26,24 @@ export async function POST(request) {
         let total = 0;
         let count = 0;
 
-        Object.entries(answers).forEach(([policy, userValue]) => {
-          const candidateValue = Number(
-            candidate.policies?.[policy] ?? 3
-          );
+        Object.entries(answers).forEach(
+          ([policy, userValue]) => {
+            const candidateValue = Number(
+              candidate.policies?.[policy] ?? 3
+            );
 
-          const userScore = Number(userValue);
+            const userScore = Number(userValue);
 
-          const difference = Math.abs(
-            candidateValue - userScore
-          );
+            const difference = Math.abs(
+              candidateValue - userScore
+            );
 
-          const similarity = 1 - difference / 4;
+            const similarity = 1 - difference / 4;
 
-          total += similarity;
-          count++;
-        });
+            total += similarity;
+            count++;
+          }
+        );
 
         const score =
           count > 0
