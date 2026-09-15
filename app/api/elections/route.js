@@ -1,11 +1,13 @@
-imporimport data from "../../../data/elections.json";
+import data from "../../../data/elections.json";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const area = searchParams.get("area");
 
   const elections = area
-    ? data.elections.filter((election) => election.areaId === area)
+    ? data.elections.filter(
+        (election) => election.areaId === area
+      )
     : [];
 
   return Response.json({
