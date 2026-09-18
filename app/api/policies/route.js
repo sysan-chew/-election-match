@@ -12,12 +12,15 @@ export async function GET() {
     .order("id", { ascending: true });
 
   if (error) {
-    console.error(error);
+    console.error("Supabase policies error:", error);
 
     return Response.json(
       {
         policies: [],
-        error: "政策データの取得に失敗しました。",
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
       },
       { status: 500 }
     );
