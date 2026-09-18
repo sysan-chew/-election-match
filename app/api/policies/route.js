@@ -1,22 +1,29 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export async function GET() {
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+  );
+
   const { data, error } = await supabase
     .from("policies")
-    .select("*")
+    .select("id, election_id, title, description, category, created_at")
     .order("id", { ascending: true });
 
   if (error) {
+    console.error(error);
+
     return Response.json(
-      { error: error.message },
+      {
+        policies: [],
+        error: "政策データの取得に失敗しました。",
+      },
       { status: 500 }
     );
   }
 
-  return Response.json(data);
+  return Response.json({
+    policies: data || [],
+  });
 }
