@@ -8,8 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("candidates")
-    .select("id, name, party, profile, policy")
-    .order("id");
+    .select("name, party, profile, policy");
 
   if (error) {
     console.error(error);
