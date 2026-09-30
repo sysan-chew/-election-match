@@ -4,21 +4,44 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   const [candidates, setCandidates] = useState([]);
+  const [policies, setPolicies] = useState([]);
+  const [candidatePolicies, setCandidatePolicies] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadCandidates() {
+    async function loadData() {
       try {
-        const response = await fetch("/api/candidates");
+        const [candidatesResponse, policiesResponse, candidatePoliciesResponse] =
+          await Promise.all([
+            fetch("/api/candidates"),
+            fetch("/api/policies"),
+            fetch("/api/candidate-policies"),
+          ]);
 
-        if (!response.ok) {
+        if (!candidatesResponse.ok) {
           throw new Error("候補者データを取得できませんでした");
         }
 
-        const data = await response.json();
+        if (!policiesResponse.ok) {
+          throw new Error("政策データを取得できませんでした");
+        }
 
-        setCandidates(data.candidates || []);
+        if (!candidatePoliciesResponse.ok) {
+          throw new Error("候補者政策データを取得できませんでした");
+        }
+
+        const candidatesData = await candidatesResponse.json();
+        const policiesData = await policiesResponse.json();
+        const candidatePoliciesData =
+          await candidatePoliciesResponse.json();
+
+        setCandidates(candidatesData.candidates || []);
+        setPolicies(policiesData.policies || []);
+        setCandidatePolicies(
+          candidatePoliciesData.candidatePolicies || []
+        );
       } catch (err) {
         setError(err.message);
       } finally {
@@ -26,8 +49,27 @@ export default function Home() {
       }
     }
 
-    loadCandidates();
+    loadData();
   }, []);
+
+  function getPoliciesForCandidate(candidateId) {
+    const links = candidatePolicies.filter(
+      (item) => item.candidate_id === candidateId
+    );
+
+    return links.map((link) => {
+      const policy = policies.find(
+        (item) => item.id === link.policy_id
+      );
+
+      return {
+        ...policy,
+        position: link.position,
+        stance: link.stance,
+        source_url: link.source_url,
+      };
+    });
+  }
 
   return (
     <main
@@ -36,93 +78,33 @@ export default function Home() {
         margin: "0 auto",
         padding: "24px 16px",
         fontFamily: "sans-serif",
+        background: "#ffffff",
+        color: "#111827",
       }}
     >
+      {/* ヘッダー */}
       <header
         style={{
           padding: "32px 20px",
-          marginBottom: "24px",
+          marginBottom: "28px",
           borderRadius: "16px",
           background: "#f3f4f6",
         }}
       >
-        <h1>全国候補者マッチング</h1>
-
-        <p>
-          全国の候補者の公表情報を確認・比較し、
-          自分の考えとの一致度を確認できる情報整理サイトです。
-        </p>
-      </header>
-
-      <section>
-        <h2>候補者一覧</h2>
-
-        {loading && <p>候補者情報を読み込んでいます…</p>}
-
-        {error && (
-          <p style={{ color: "red" }}>
-            {error}
-          </p>
-        )}
-
-        {!loading && !error && candidates.length === 0 && (
-          <p>
-            現在、候補者データが登録されていません。
-          </p>
-        )}
-
-        <div
+        <h1
           style={{
-            display: "grid",
-            gap: "16px",
+            marginTop: 0,
+            marginBottom: "12px",
+            fontSize: "30px",
           }}
         >
-          {candidates.map((candidate) => (
-            <article
-              key={candidate.id}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: "12px",
-                padding: "20px",
-              }}
-            >
-              <h3>{candidate.name}</h3>
+          全国候補者マッチング
+        </h1>
 
-              <p>
-                <strong>所属：</strong>
-                {candidate.party || "未登録"}
-              </p>
-
-              <h4>プロフィール</h4>
-              <p>
-                {candidate.profile || "公表情報なし"}
-              </p>
-
-              <h4>政策</h4>
-              <p>
-                {candidate.policy || "公表情報なし"}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <footer
-        style={{
-          marginTop: "40px",
-          paddingTop: "20px",
-          borderTop: "1px solid #ddd",
-          fontSize: "14px",
-        }}
-      >
-        <p>
-          このサイトは候補者等が公表した情報を整理して表示するものです。
-        </p>
-
-        <p>
-          特定の候補者への投票を推奨するものではありません。
-        </p>
-      </footer>
-    </main>
-  );
-}
+        <p
+          style={{
+            lineHeight: 1.8,
+            marginBottom: 0,
+          }}
+        >
+          全国の
