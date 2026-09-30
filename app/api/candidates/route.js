@@ -8,15 +8,15 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("candidates")
-    .select("name, party, profile, policy");
+    .select("*");
 
   if (error) {
-    console.error(error);
+    console.error("Supabase candidates error:", error);
 
     return Response.json(
       {
         candidates: [],
-        error: "候補者データの取得に失敗しました。",
+        error: error.message,
       },
       { status: 500 }
     );
