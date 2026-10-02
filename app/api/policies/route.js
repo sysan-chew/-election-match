@@ -14,19 +14,32 @@ export async function GET() {
   if (error) {
     console.error("Supabase policies error:", error);
 
-    return Response.json(
-      {
+    return new Response(
+      JSON.stringify({
         policies: [],
         error: error.message,
         details: error.details,
         hint: error.hint,
         code: error.code,
-      },
-      { status: 500 }
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+        },
+      }
     );
   }
 
-  return Response.json({
-    policies: data || [],
-  });
+  return new Response(
+    JSON.stringify({
+      policies: data || [],
+    }),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    }
+  );
 }
