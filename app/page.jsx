@@ -19,6 +19,13 @@ export default function Home() {
   const [error, setError] = useState("");
 
   // =========================
+  // 政策診断
+  // =========================
+  const [diagnosisMode, setDiagnosisMode] = useState(false);
+  const [diagnosisFinished, setDiagnosisFinished] = useState(false);
+  const [answers, setAnswers] = useState({});
+
+  // =========================
   // データ取得
   // =========================
   useEffect(() => {
@@ -40,15 +47,11 @@ export default function Home() {
         ]);
 
         if (!candidatesResponse.ok) {
-          throw new Error(
-            "候補者データを取得できませんでした"
-          );
+          throw new Error("候補者データを取得できませんでした");
         }
 
         if (!policiesResponse.ok) {
-          throw new Error(
-            "政策データを取得できませんでした"
-          );
+          throw new Error("政策データを取得できませんでした");
         }
 
         if (!candidatePoliciesResponse.ok) {
@@ -58,9 +61,7 @@ export default function Home() {
         }
 
         if (!electionsResponse.ok) {
-          throw new Error(
-            "選挙データを取得できませんでした"
-          );
+          throw new Error("選挙データを取得できませんでした");
         }
 
         const candidatesData =
@@ -277,12 +278,186 @@ export default function Home() {
   ]);
 
   // =========================
+  // 現在の選挙の政策
+  // =========================
+  const diagnosisPolicies = useMemo(() => {
+    if (!selectedElection) {
+      return [];
+    }
+
+    return policies.filter(
+      (policy) =>
+        String(policy.election_id) ===
+        String(selectedElection)
+    );
+  }, [policies, selectedElection]);
+
+  // =========================
+  // 政策診断対象候補者
+  // =========================
+  const diagnosisCandidates = useMemo(() => {
+    if (!selectedElection) {
+      return [];
+    }
+
+    return candidates.filter(
+      (candidate) =>
+        String(candidate.election_id) ===
+        String(selectedElection)
+    );
+  }, [candidates, selectedElection]);
+
+  // =========================
+  // 候補者の立場を数値化
+  // =========================
+  function convertPositionToScore(position) {
+    const text = String(position || "");
+
+    if (
+      text.includes("やや賛成")
+    ) {
+      return 1;
+    }
+
+    if (
+      text.includes("賛成")
+    ) {
+      return 2;
+    }
+
+    if (
+      text.includes("やや反対")
+    ) {
+      return -1;
+    }
+
+    if (
+      text.includes("反対")
+    ) {
+      return -2;
+    }
+
+    if (
+      text.includes("中立") ||
+      text.includes("どちらとも")
+    ) {
+      return 0;
+    }
+
+    return null;
+  }
+
+  // =========================
+  // 一致率計算
+  // =========================
+  const diagnosisResults = useMemo(() => {
+    if (
+      !diagnosisFinished ||
+      diagnosisCandidates.length === 0
+    ) {
+      return [];
+    }
+
+    const results = diagnosisCandidates.map(
+      (candidate) => {
+        const candidatePolicyList =
+          getPoliciesForCandidate(
+            candidate.id
+          );
+
+        let totalScore = 0;
+        let matchedCount = 0;
+
+        diagnosisPolicies.forEach((policy) => {
+          const userAnswer =
+            answers[policy.id];
+
+          if (
+            userAnswer === undefined ||
+            userAnswer === null
+          ) {
+            return;
+          }
+
+          const candidatePolicy =
+            candidatePolicyList.find(
+              (item) =>
+                Number(item.id) ===
+                Number(policy.id)
+            );
+
+          if (!candidatePolicy) {
+            return;
+          }
+
+          const candidatePosition =
+            convertPositionToScore(
+              candidatePolicy.position
+            );
+
+          if (
+            candidatePosition === null
+          ) {
+            return;
+          }
+
+          const difference = Math.abs(
+            Number(userAnswer) -
+              candidatePosition
+          );
+
+          const matchScore =
+            Math.max(
+              0,
+              100 - difference * 25
+            );
+
+          totalScore += matchScore;
+          matchedCount++;
+        });
+
+        const matchRate =
+          matchedCount > 0
+            ? Math.round(
+                totalScore /
+                  matchedCount
+              )
+            : null;
+
+        return {
+          ...candidate,
+          matchRate,
+          matchedCount,
+        };
+      }
+    );
+
+    return results
+      .filter(
+        (candidate) =>
+          candidate.matchRate !== null
+      )
+      .sort(
+        (a, b) =>
+          b.matchRate - a.matchRate
+      );
+  }, [
+    diagnosisFinished,
+    diagnosisCandidates,
+    diagnosisPolicies,
+    answers,
+  ]);
+
+  // =========================
   // 都道府県変更
   // =========================
   function handlePrefectureChange(value) {
     setSelectedPrefecture(value);
     setSelectedMunicipality("");
     setSelectedElection("");
+    setDiagnosisMode(false);
+    setDiagnosisFinished(false);
+    setAnswers({});
   }
 
   // =========================
@@ -291,6 +466,85 @@ export default function Home() {
   function handleMunicipalityChange(value) {
     setSelectedMunicipality(value);
     setSelectedElection("");
+    setDiagnosisMode(false);
+    setDiagnosisFinished(false);
+    setAnswers({});
+  }
+
+  // =========================
+  // 選挙変更
+  // =========================
+  function handleElectionChange(value) {
+    setSelectedElection(value);
+    setDiagnosisMode(false);
+    setDiagnosisFinished(false);
+    setAnswers({});
+    setSearch("");
+    setSelectedParty("すべて");
+  }
+
+  // =========================
+  // 診断開始
+  // =========================
+  function startDiagnosis() {
+    setAnswers({});
+    setDiagnosisFinished(false);
+    setDiagnosisMode(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  // =========================
+  // 回答
+  // =========================
+  function handleAnswer(policyId, value) {
+    setAnswers((current) => ({
+      ...current,
+      [policyId]: Number(value),
+    }));
+  }
+
+  // =========================
+  // 診断完了
+  // =========================
+  function finishDiagnosis() {
+    const unanswered =
+      diagnosisPolicies.filter(
+        (policy) =>
+          answers[policy.id] === undefined
+      );
+
+    if (unanswered.length > 0) {
+      alert(
+        `まだ${unanswered.length}問回答していません。`
+      );
+      return;
+    }
+
+    setDiagnosisFinished(true);
+    setDiagnosisMode(false);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  // =========================
+  // 診断をやり直す
+  // =========================
+  function restartDiagnosis() {
+    setAnswers({});
+    setDiagnosisFinished(false);
+    setDiagnosisMode(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   return (
@@ -309,7 +563,8 @@ export default function Home() {
       <header
         style={{
           background: "#ffffff",
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom:
+            "1px solid #e5e7eb",
         }}
       >
         <div
@@ -391,7 +646,6 @@ export default function Home() {
               gap: "12px",
             }}
           >
-            {/* 都道府県 */}
             <select
               value={selectedPrefecture}
               onChange={(e) =>
@@ -402,7 +656,8 @@ export default function Home() {
               style={{
                 width: "100%",
                 padding: "12px",
-                border: "1px solid #d1d5db",
+                border:
+                  "1px solid #d1d5db",
                 borderRadius: "10px",
                 background: "#ffffff",
                 fontSize: "15px",
@@ -424,7 +679,6 @@ export default function Home() {
               )}
             </select>
 
-            {/* 市区町村 */}
             <select
               value={selectedMunicipality}
               onChange={(e) =>
@@ -435,7 +689,8 @@ export default function Home() {
               style={{
                 width: "100%",
                 padding: "12px",
-                border: "1px solid #d1d5db",
+                border:
+                  "1px solid #d1d5db",
                 borderRadius: "10px",
                 background: "#ffffff",
                 fontSize: "15px",
@@ -458,18 +713,18 @@ export default function Home() {
               )}
             </select>
 
-            {/* 選挙 */}
             <select
               value={selectedElection}
               onChange={(e) =>
-                setSelectedElection(
+                handleElectionChange(
                   e.target.value
                 )
               }
               style={{
                 width: "100%",
                 padding: "12px",
-                border: "1px solid #d1d5db",
+                border:
+                  "1px solid #d1d5db",
                 borderRadius: "10px",
                 background: "#ffffff",
                 fontSize: "15px",
@@ -495,7 +750,6 @@ export default function Home() {
             </select>
           </div>
 
-          {/* 選択中の選挙 */}
           {selectedElectionData && (
             <div
               style={{
@@ -503,7 +757,8 @@ export default function Home() {
                 padding: "16px",
                 borderRadius: "12px",
                 background: "#f9fafb",
-                border: "1px solid #e5e7eb",
+                border:
+                  "1px solid #e5e7eb",
               }}
             >
               <strong>
@@ -518,82 +773,56 @@ export default function Home() {
                   fontSize: "14px",
                 }}
               >
-                {selectedElectionData.prefecture}{" "}
-                {selectedElectionData.municipality}
+                {
+                  selectedElectionData.prefecture
+                }{" "}
+                {
+                  selectedElectionData.municipality
+                }
               </p>
             </div>
           )}
         </section>
 
         {/* =========================
-            ローディング
+            政策診断
         ========================= */}
-        {loading && (
-          <section
-            style={{
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "16px",
-              padding: "24px",
-            }}
-          >
-            <p style={{ margin: 0 }}>
-              情報を読み込んでいます…
-            </p>
-          </section>
-        )}
-
-        {/* =========================
-            エラー
-        ========================= */}
-        {error && (
-          <section
-            style={{
-              padding: "18px",
-              borderRadius: "12px",
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              color: "#b91c1c",
-            }}
-          >
-            <strong>
-              データ取得エラー
-            </strong>
-
-            <p
-              style={{
-                marginBottom: 0,
-              }}
-            >
-              {error}
-            </p>
-          </section>
-        )}
-
-        {/* =========================
-            候補者
-        ========================= */}
-        {!loading && !error && (
-          <>
+        {selectedElection &&
+          !loading &&
+          !error &&
+          diagnosisPolicies.length > 0 &&
+          !diagnosisMode &&
+          !diagnosisFinished && (
             <section
               style={{
                 background: "#ffffff",
-                border: "1px solid #e5e7eb",
+                border:
+                  "2px solid #2563eb",
                 borderRadius: "16px",
-                padding: "20px",
+                padding: "24px",
                 marginBottom: "24px",
               }}
             >
               <h2
                 style={{
                   marginTop: 0,
-                  fontSize: "22px",
+                  fontSize: "23px",
                 }}
               >
-                {selectedElectionData
-                  ? `${selectedElectionData.name}の候補者`
-                  : "候補者一覧"}
+                自分の考えと候補者の政策を比較する
               </h2>
+
+              <p
+                style={{
+                  color: "#4b5563",
+                  lineHeight: 1.8,
+                }}
+              >
+                {selectedElectionData?.name}
+                に登録されている政策について回答すると、
+                あなたの考えと候補者の公表政策が
+                どのくらい一致しているかを確認できます。
+              </p>
 
               <p
                 style={{
@@ -601,386 +830,240 @@ export default function Home() {
                   fontSize: "14px",
                 }}
               >
-                {selectedElection
-                  ? "選択した選挙に登録されている候補者を表示しています。"
-                  : "選挙を選択すると、その選挙の候補者だけを表示できます。"}
+                全{diagnosisPolicies.length}
+                問・5段階で回答します。
               </p>
 
-              {/* 検索 */}
-              <input
-                type="text"
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
-                placeholder="候補者名・政党・プロフィールから検索"
+              <button
+                onClick={startDiagnosis}
                 style={{
                   width: "100%",
-                  boxSizing: "border-box",
-                  padding: "13px 14px",
-                  border: "1px solid #d1d5db",
+                  padding: "15px",
+                  border: "none",
                   borderRadius: "10px",
-                  fontSize: "15px",
-                }}
-              />
-
-              {/* 政党 */}
-              <select
-                value={selectedParty}
-                onChange={(e) =>
-                  setSelectedParty(
-                    e.target.value
-                  )
-                }
-                style={{
-                  width: "100%",
-                  marginTop: "12px",
-                  padding: "12px",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "10px",
-                  background: "#ffffff",
-                  fontSize: "15px",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
-                {parties.map((party) => (
-                  <option
-                    key={party}
-                    value={party}
-                  >
-                    {party === "すべて"
-                      ? "すべての政党・所属"
-                      : party}
-                  </option>
-                ))}
-              </select>
+                政策診断を始める
+              </button>
             </section>
-
-            {/* 候補者なし */}
-            {filteredCandidates.length === 0 && (
-              <section
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "16px",
-                  padding: "24px",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#6b7280",
-                  }}
-                >
-                  条件に一致する候補者が
-                  ありません。
-                </p>
-              </section>
-            )}
-
-            {/* =========================
-                候補者カード
-            ========================= */}
-            <div
-              style={{
-                display: "grid",
-                gap: "18px",
-              }}
-            >
-              {filteredCandidates.map(
-                (candidate) => {
-                  const candidatePolicyList =
-                    getPoliciesForCandidate(
-                      candidate.id
-                    );
-
-                  return (
-                    <article
-                      key={candidate.id}
-                      style={{
-                        background: "#ffffff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "16px",
-                        padding: "22px",
-                      }}
-                    >
-                      {/* 候補者基本情報 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent:
-                            "space-between",
-                          alignItems:
-                            "flex-start",
-                          gap: "16px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div>
-                          <h3
-                            style={{
-                              margin: 0,
-                              fontSize: "24px",
-                            }}
-                          >
-                            {candidate.name ||
-                              "候補者名未登録"}
-                          </h3>
-
-                          <p
-                            style={{
-                              marginTop: "8px",
-                              marginBottom: 0,
-                              color: "#4b5563",
-                            }}
-                          >
-                            <strong>
-                              所属：
-                            </strong>
-
-                            {candidate.party ||
-                              "未登録"}
-                          </p>
-                        </div>
-
-                        {candidate.official_url && (
-                          <a
-                            href={
-                              candidate.official_url
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              padding:
-                                "9px 14px",
-                              borderRadius:
-                                "8px",
-                              border:
-                                "1px solid #d1d5db",
-                              color: "#111827",
-                              textDecoration:
-                                "none",
-                              fontSize: "14px",
-                            }}
-                          >
-                            公式情報 ↗
-                          </a>
-                        )}
-                      </div>
-
-                      {/* プロフィール */}
-                      <div
-                        style={{
-                          marginTop: "22px",
-                          paddingTop: "18px",
-                          borderTop:
-                            "1px solid #f0f0f0",
-                        }}
-                      >
-                        <h4>
-                          プロフィール
-                        </h4>
-
-                        <p
-                          style={{
-                            lineHeight: 1.8,
-                            whiteSpace:
-                              "pre-wrap",
-                            color: "#374151",
-                          }}
-                        >
-                          {candidate.profile ||
-                            "公表情報なし"}
-                        </p>
-                      </div>
-
-                      {/* 政策 */}
-                      <div
-                        style={{
-                          marginTop: "24px",
-                        }}
-                      >
-                        <h4>
-                          政策・立場
-                        </h4>
-
-                        {candidatePolicyList.length ===
-                        0 ? (
-                          <p
-                            style={{
-                              color:
-                                "#6b7280",
-                            }}
-                          >
-                            政策情報はまだ登録されていません。
-                          </p>
-                        ) : (
-                          <div
-                            style={{
-                              display: "grid",
-                              gap: "12px",
-                            }}
-                          >
-                            {candidatePolicyList.map(
-                              (
-                                policy,
-                                index
-                              ) => (
-                                <div
-                                  key={`${candidate.id}-${policy.id}-${index}`}
-                                  style={{
-                                    padding:
-                                      "16px",
-                                    borderRadius:
-                                      "12px",
-                                    background:
-                                      "#f9fafb",
-                                    border:
-                                      "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <strong>
-                                    {policy.title ||
-                                      "政策名未登録"}
-                                  </strong>
-
-                                  {policy.category && (
-                                    <p
-                                      style={{
-                                        fontSize:
-                                          "13px",
-                                        color:
-                                          "#6b7280",
-                                      }}
-                                    >
-                                      分野：
-                                      {
-                                        policy.category
-                                      }
-                                    </p>
-                                  )}
-
-                                  <p
-                                    style={{
-                                      lineHeight:
-                                        1.7,
-                                    }}
-                                  >
-                                    {policy.description ||
-                                      "政策の詳細情報はありません。"}
-                                  </p>
-
-                                  {policy.stance && (
-                                    <p
-                                      style={{
-                                        marginBottom:
-                                          0,
-                                        fontSize:
-                                          "14px",
-                                      }}
-                                    >
-                                      <strong>
-                                        立場：
-                                      </strong>{" "}
-                                      {policy.stance}
-                                    </p>
-                                  )}
-
-                                  {policy.source_url && (
-                                    <p>
-                                      <a
-                                        href={
-                                          policy.source_url
-                                        }
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        出典・公式情報を見る ↗
-                                      </a>
-                                    </p>
-                                  )}
-                                </div>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* マッチング */}
-                      <div
-                        style={{
-                          marginTop: "22px",
-                          padding: "18px",
-                          borderRadius: "12px",
-                          background: "#f9fafb",
-                          border:
-                            "1px dashed #d1d5db",
-                          textAlign: "center",
-                        }}
-                      >
-                        <strong>
-                          自分の考えとの一致度
-                        </strong>
-
-                        <p
-                          style={{
-                            marginTop: "7px",
-                            marginBottom: "12px",
-                            fontSize: "14px",
-                            color: "#6b7280",
-                          }}
-                        >
-                          政策について回答すると、
-                          候補者の公表情報との一致度を確認できる機能を追加予定です。
-                        </p>
-
-                        <button
-                          disabled
-                          style={{
-                            padding: "10px 18px",
-                            border: "none",
-                            borderRadius: "8px",
-                            background: "#e5e7eb",
-                            color: "#6b7280",
-                          }}
-                        >
-                          政策診断（準備中）
-                        </button>
-                      </div>
-                    </article>
-                  );
-                }
-              )}
-            </div>
-          </>
-        )}
+          )}
 
         {/* =========================
-            フッター
+            政策診断画面
         ========================= */}
-        <footer
-          style={{
-            marginTop: "50px",
-            paddingTop: "22px",
-            borderTop: "1px solid #e5e7eb",
-            fontSize: "13px",
-            color: "#6b7280",
-            lineHeight: 1.8,
-          }}
-        >
-          <p>
-            このサイトは、候補者等が公表した情報を整理して表示するものです。
-          </p>
+        {diagnosisMode &&
+          selectedElection &&
+          !loading &&
+          !error && (
+            <section
+              style={{
+                background: "#ffffff",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius: "16px",
+                padding: "24px",
+                marginBottom: "24px",
+              }}
+            >
+              <h2
+                style={{
+                  marginTop: 0,
+                  fontSize: "24px",
+                }}
+              >
+                政策診断
+              </h2>
 
-          <p>
-            掲載情報については、
-            各候補者・政党・自治体等の公式情報もあわせてご確認ください。
-          </p>
+              <p
+                style={{
+                  color: "#6b7280",
+                  lineHeight: 1.7,
+                }}
+              >
+                あなたの考えに最も近いものを
+                選んでください。
+              </p>
 
-          <p>
-            特定の候補者への投票を推奨するものではありません。
-          </p>
-        </footer>
-      </div>
-    </main>
-  );
-}
+              <div
+                style={{
+                  display: "grid",
+                  gap: "18px",
+                  marginTop: "22px",
+                }}
+              >
+                {diagnosisPolicies.map(
+                  (policy, index) => (
+                    <div
+                      key={policy.id}
+                      style={{
+                        padding: "18px",
+                        borderRadius: "14px",
+                        background:
+                          "#f9fafb",
+                        border:
+                          "1px solid #e5e7eb",
+                      }}
+                    >
+                      <p
+                        style={{
+                          marginTop: 0,
+                          fontSize: "13px",
+                          color: "#6b7280",
+                        }}
+                      >
+                        Q{index + 1}
+                      </p>
+
+                      <h3
+                        style={{
+                          marginTop: "4px",
+                          marginBottom: "10px",
+                          fontSize: "18px",
+                        }}
+                      >
+                        {policy.title ||
+                          "政策"}
+                      </h3>
+
+                      {policy.category && (
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            color: "#6b7280",
+                          }}
+                        >
+                          分野：
+                          {
+                            policy.category
+                          }
+                        </p>
+                      )}
+
+                      <p
+                        style={{
+                          lineHeight: 1.8,
+                        }}
+                      >
+                        {policy.description ||
+                          "この政策について、あなたの考えを選択してください。"}
+                      </p>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gap: "8px",
+                          marginTop: "16px",
+                        }}
+                      >
+                        {[
+                          {
+                            value: 2,
+                            label: "賛成",
+                          },
+                          {
+                            value: 1,
+                            label: "やや賛成",
+                          },
+                          {
+                            value: 0,
+                            label:
+                              "どちらともいえない",
+                          },
+                          {
+                            value: -1,
+                            label: "やや反対",
+                          },
+                          {
+                            value: -2,
+                            label: "反対",
+                          },
+                        ].map((option) => {
+                          const checked =
+                            answers[
+                              policy.id
+                            ] ===
+                            option.value;
+
+                          return (
+                            <button
+                              key={
+                                option.value
+                              }
+                              onClick={() =>
+                                handleAnswer(
+                                  policy.id,
+                                  option.value
+                                )
+                              }
+                              style={{
+                                padding:
+                                  "13px",
+                                borderRadius:
+                                  "10px",
+                                border: checked
+                                  ? "2px solid #2563eb"
+                                  : "1px solid #d1d5db",
+                                background:
+                                  checked
+                                    ? "#eff6ff"
+                                    : "#ffffff",
+                                color:
+                                  "#111827",
+                                textAlign:
+                                  "left",
+                                fontSize:
+                                  "15px",
+                                cursor:
+                                  "pointer",
+                                fontWeight:
+                                  checked
+                                    ? 700
+                                    : 400,
+                              }}
+                            >
+                              {checked
+                                ? "✓ "
+                                : ""}
+                              {
+                                option.label
+                              }
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <button
+                onClick={
+                  finishDiagnosis
+                }
+                style={{
+                  width: "100%",
+                  marginTop: "24px",
+                  padding: "15px",
+                  border: "none",
+                  borderRadius: "10px",
+                  background: "#111827",
+                  color: "#ffffff",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                診断結果を見る
+              </button>
+            </section>
+          )}
+
+        {/* =========================
+            診断結果
+        ========================= */}
+        {diagnosis
