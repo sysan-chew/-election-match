@@ -137,10 +137,7 @@ export default function Home() {
               !selectedPrefecture ||
               election.prefecture === selectedPrefecture
           )
-          .map(
-            (election) =>
-              election.municipality
-          )
+          .map((election) => election.municipality)
           .filter(Boolean)
       ),
     ];
@@ -159,10 +156,7 @@ export default function Home() {
         !selectedMunicipality ||
         election.municipality === selectedMunicipality;
 
-      return (
-        prefectureMatch &&
-        municipalityMatch
-      );
+      return prefectureMatch && municipalityMatch;
     });
   }, [
     elections,
@@ -171,7 +165,7 @@ export default function Home() {
   ]);
 
   // =========================
-  // 選択された選挙
+  // 選択中の選挙
   // =========================
   const selectedElectionData = useMemo(() => {
     if (!selectedElection) {
@@ -206,14 +200,12 @@ export default function Home() {
   }, [candidates]);
 
   // =========================
-  // 候補者の政策
+  // 候補者の政策を取得
   // =========================
-  function getPoliciesForCandidate(
-    candidateId
-  ) {
+  function getPoliciesForCandidate(candidateId) {
     const links = candidatePolicies.filter(
-      (item) =>
-        Number(item.candidate_id) ===
+      (link) =>
+        Number(link.candidate_id) ===
         Number(candidateId)
     );
 
@@ -240,7 +232,7 @@ export default function Home() {
   }
 
   // =========================
-  // 候補者を選挙で絞り込み
+  // 選択中の選挙の候補者
   // =========================
   const electionCandidates = useMemo(() => {
     if (!selectedElection) {
@@ -255,7 +247,7 @@ export default function Home() {
   }, [candidates, selectedElection]);
 
   // =========================
-  // 検索・政党で絞り込み
+  // 候補者検索・政党絞り込み
   // =========================
   const filteredCandidates = useMemo(() => {
     const keyword =
@@ -292,7 +284,7 @@ export default function Home() {
   ]);
 
   // =========================
-  // 現在の選挙の政策
+  // 選択中の選挙の政策
   // =========================
   const diagnosisPolicies = useMemo(() => {
     if (!selectedElection) {
@@ -307,7 +299,7 @@ export default function Home() {
   }, [policies, selectedElection]);
 
   // =========================
-  // 政策診断対象候補者
+  // 診断対象の候補者
   // =========================
   const diagnosisCandidates = useMemo(() => {
     if (!selectedElection) {
@@ -324,9 +316,7 @@ export default function Home() {
   // =========================
   // 候補者の立場を数値化
   // =========================
-  function convertPositionToScore(
-    position
-  ) {
+  function convertPositionToScore(position) {
     const text = String(position || "");
 
     if (text.includes("やや賛成")) {
@@ -356,145 +346,146 @@ export default function Home() {
   }
 
   // =========================
-  // 一致率計算
+  // 診断結果
   // =========================
   const diagnosisResults = useMemo(() => {
     if (
       !diagnosisFinished ||
-      diagnosisCandidates.length === 0
+      diagnosisCandidates.length === 0 ||
+      diagnosisPolicies.length === 0
     ) {
       return [];
     }
 
-    const results =
-      diagnosisCandidates.map(
-        (candidate) => {
-          const candidatePolicyList =
-            getPoliciesForCandidate(
-              candidate.id
-            );
-
-          let totalScore = 0;
-          let matchedCount = 0;
-
-          const matchedPolicies = [];
-          const closePolicies = [];
-          const differentPolicies = [];
-
-          diagnosisPolicies.forEach(
-            (policy) => {
-              const userAnswer =
-                answers[policy.id];
-
-              if (
-                userAnswer ===
-                  undefined ||
-                userAnswer === null
-              ) {
-                return;
-              }
-
-              const candidatePolicy =
-                candidatePolicyList.find(
-                  (item) =>
-                    Number(item.id) ===
-                    Number(policy.id)
-                );
-
-              if (!candidatePolicy) {
-                return;
-              }
-
-              const candidatePosition =
-                convertPositionToScore(
-                  candidatePolicy.position
-                );
-
-              if (
-                candidatePosition === null
-              ) {
-                return;
-              }
-
-              const difference =
-                Math.abs(
-                  Number(userAnswer) -
-                    candidatePosition
-                );
-
-              const matchScore =
-                Math.max(
-                  0,
-                  100 -
-                    difference * 25
-                );
-
-              totalScore +=
-                matchScore;
-
-              matchedCount++;
-
-              const answerLabels = {
-                2: "賛成",
-                1: "やや賛成",
-                0: "どちらともいえない",
-                "-1": "やや反対",
-                "-2": "反対",
-              };
-
-              const policyResult = {
-                id: policy.id,
-                title:
-                  policy.title ||
-                  "政策名未登録",
-                category:
-                  policy.category || "",
-                userAnswer:
-                  answerLabels[
-                    userAnswer
-                  ],
-                candidateAnswer:
-                  candidatePolicy.position ||
-                  "立場不明",
-                matchScore,
-              };
-
-              if (difference === 0) {
-                matchedPolicies.push(
-                  policyResult
-                );
-              } else if (
-                difference === 1
-              ) {
-                closePolicies.push(
-                  policyResult
-                );
-              } else {
-                differentPolicies.push(
-                  policyResult
-                );
-              }
-            }
+    const results = diagnosisCandidates.map(
+      (candidate) => {
+        // この候補者に紐づく政策
+        const candidateLinks =
+          candidatePolicies.filter(
+            (link) =>
+              Number(link.candidate_id) ===
+              Number(candidate.id)
           );
 
-          const matchRate =
-            matchedCount > 0
-              ? Math.round(
-                  totalScore /
-                    matchedCount
-                )
-              : null;
+        let totalScore = 0;
+        let matchedCount = 0;
 
-          return {
-            ...candidate,
-            matchRate,
-            matchedCount,
-            matchedPolicies,
-            closePolicies,
-            differentPolicies,
-          };
-        }
-      );
+        const matchedPolicies = [];
+        const closePolicies = [];
+        const differentPolicies = [];
+
+        // 選挙の各政策を確認
+        diagnosisPolicies.forEach(
+          (policy) => {
+            const userAnswer =
+              answers[policy.id];
+
+            // 未回答なら比較しない
+            if (
+              userAnswer === undefined ||
+              userAnswer === null
+            ) {
+              return;
+            }
+
+            // 候補者と政策の紐付けを探す
+            const candidateLink =
+              candidateLinks.find(
+                (link) =>
+                  Number(link.policy_id) ===
+                  Number(policy.id)
+              );
+
+            // この候補者がこの政策について
+            // 情報を持っていない場合
+            if (!candidateLink) {
+              return;
+            }
+
+            // 候補者の立場を数値化
+            const candidatePosition =
+              convertPositionToScore(
+                candidateLink.position
+              );
+
+            if (candidatePosition === null) {
+              return;
+            }
+
+            // あなたの回答と候補者の立場の差
+            const difference =
+              Math.abs(
+                Number(userAnswer) -
+                  candidatePosition
+              );
+
+            // 一致率
+            const matchScore = Math.max(
+              0,
+              100 - difference * 25
+            );
+
+            totalScore += matchScore;
+            matchedCount++;
+
+            const answerLabels = {
+              2: "賛成",
+              1: "やや賛成",
+              0: "どちらともいえない",
+              "-1": "やや反対",
+              "-2": "反対",
+            };
+
+            const policyResult = {
+              id: policy.id,
+              title:
+                policy.title ||
+                "政策名未登録",
+              category:
+                policy.category || "",
+              userAnswer:
+                answerLabels[
+                  String(userAnswer)
+                ],
+              candidateAnswer:
+                candidateLink.position ||
+                "立場不明",
+              matchScore,
+            };
+
+            if (difference === 0) {
+              matchedPolicies.push(
+                policyResult
+              );
+            } else if (difference === 1) {
+              closePolicies.push(
+                policyResult
+              );
+            } else {
+              differentPolicies.push(
+                policyResult
+              );
+            }
+          }
+        );
+
+        const matchRate =
+          matchedCount > 0
+            ? Math.round(
+                totalScore / matchedCount
+              )
+            : null;
+
+        return {
+          ...candidate,
+          matchRate,
+          matchedCount,
+          matchedPolicies,
+          closePolicies,
+          differentPolicies,
+        };
+      }
+    );
 
     return results
       .filter(
@@ -503,25 +494,24 @@ export default function Home() {
       )
       .sort(
         (a, b) =>
-          b.matchRate -
-          a.matchRate
+          b.matchRate - a.matchRate
       );
   }, [
     diagnosisFinished,
     diagnosisCandidates,
     diagnosisPolicies,
+    candidatePolicies,
     answers,
   ]);
 
   // =========================
   // 都道府県変更
   // =========================
-  function handlePrefectureChange(
-    value
-  ) {
+  function handlePrefectureChange(value) {
     setSelectedPrefecture(value);
     setSelectedMunicipality("");
     setSelectedElection("");
+
     setDiagnosisMode(false);
     setDiagnosisFinished(false);
     setAnswers({});
@@ -530,11 +520,10 @@ export default function Home() {
   // =========================
   // 市区町村変更
   // =========================
-  function handleMunicipalityChange(
-    value
-  ) {
+  function handleMunicipalityChange(value) {
     setSelectedMunicipality(value);
     setSelectedElection("");
+
     setDiagnosisMode(false);
     setDiagnosisFinished(false);
     setAnswers({});
@@ -543,13 +532,13 @@ export default function Home() {
   // =========================
   // 選挙変更
   // =========================
-  function handleElectionChange(
-    value
-  ) {
+  function handleElectionChange(value) {
     setSelectedElection(value);
+
     setDiagnosisMode(false);
     setDiagnosisFinished(false);
     setAnswers({});
+
     setSearch("");
     setSelectedParty("すべて");
   }
@@ -558,6 +547,13 @@ export default function Home() {
   // 診断開始
   // =========================
   function startDiagnosis() {
+    if (diagnosisPolicies.length === 0) {
+      alert(
+        "この選挙にはまだ政策が登録されていません。"
+      );
+      return;
+    }
+
     setAnswers({});
     setDiagnosisFinished(false);
     setDiagnosisMode(true);
@@ -571,10 +567,7 @@ export default function Home() {
   // =========================
   // 回答
   // =========================
-  function handleAnswer(
-    policyId,
-    value
-  ) {
+  function handleAnswer(policyId, value) {
     setAnswers((current) => ({
       ...current,
       [policyId]: Number(value),
@@ -588,8 +581,7 @@ export default function Home() {
     const unanswered =
       diagnosisPolicies.filter(
         (policy) =>
-          answers[policy.id] ===
-          undefined
+          answers[policy.id] === undefined
       );
 
     if (unanswered.length > 0) {
@@ -683,7 +675,7 @@ export default function Home() {
         }}
       >
         {/* =========================
-            選挙選択
+            選挙を選ぶ
         ========================= */}
         <section
           style={{
@@ -808,8 +800,7 @@ export default function Home() {
                 fontSize: "15px",
               }}
               disabled={
-                filteredElections.length ===
-                0
+                filteredElections.length === 0
               }
             >
               <option value="">
@@ -866,13 +857,61 @@ export default function Home() {
         </section>
 
         {/* =========================
+            ローディング
+        ========================= */}
+        {loading && (
+          <section
+            style={{
+              background: "#ffffff",
+              border:
+                "1px solid #e5e7eb",
+              borderRadius: "16px",
+              padding: "24px",
+              marginBottom: "24px",
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              情報を読み込んでいます…
+            </p>
+          </section>
+        )}
+
+        {/* =========================
+            エラー
+        ========================= */}
+        {error && (
+          <section
+            style={{
+              padding: "18px",
+              borderRadius: "12px",
+              background: "#fef2f2",
+              border:
+                "1px solid #fecaca",
+              color: "#b91c1c",
+              marginBottom: "24px",
+            }}
+          >
+            <strong>
+              データ取得エラー
+            </strong>
+
+            <p
+              style={{
+                marginBottom: 0,
+              }}
+            >
+              {error}
+            </p>
+          </section>
+        )}
+
+        {/* =========================
             政策診断開始
         ========================= */}
-        {selectedElection &&
-          !loading &&
+        {!loading &&
           !error &&
-          diagnosisPolicies.length >
-            0 &&
+          selectedElection &&
+          diagnosisPolicies.length > 0 &&
           !diagnosisMode &&
           !diagnosisFinished && (
             <section
@@ -922,9 +961,7 @@ export default function Home() {
               </p>
 
               <button
-                onClick={
-                  startDiagnosis
-                }
+                onClick={startDiagnosis}
                 style={{
                   width: "100%",
                   padding: "15px",
@@ -943,7 +980,7 @@ export default function Home() {
           )}
 
         {/* =========================
-            政策診断画面
+            政策診断
         ========================= */}
         {diagnosisMode &&
           selectedElection &&
@@ -1002,10 +1039,8 @@ export default function Home() {
                       <p
                         style={{
                           marginTop: 0,
-                          fontSize:
-                            "13px",
-                          color:
-                            "#6b7280",
+                          fontSize: "13px",
+                          color: "#6b7280",
                         }}
                       >
                         Q{index + 1}
@@ -1013,12 +1048,9 @@ export default function Home() {
 
                       <h3
                         style={{
-                          marginTop:
-                            "4px",
-                          marginBottom:
-                            "10px",
-                          fontSize:
-                            "18px",
+                          marginTop: "4px",
+                          marginBottom: "10px",
+                          fontSize: "18px",
                         }}
                       >
                         {policy.title ||
@@ -1028,10 +1060,8 @@ export default function Home() {
                       {policy.category && (
                         <p
                           style={{
-                            fontSize:
-                              "13px",
-                            color:
-                              "#6b7280",
+                            fontSize: "13px",
+                            color: "#6b7280",
                           }}
                         >
                           分野：
@@ -1043,8 +1073,7 @@ export default function Home() {
 
                       <p
                         style={{
-                          lineHeight:
-                            1.8,
+                          lineHeight: 1.8,
                         }}
                       >
                         {policy.description ||
@@ -1053,96 +1082,85 @@ export default function Home() {
 
                       <div
                         style={{
-                          display:
-                            "grid",
+                          display: "grid",
                           gap: "8px",
-                          marginTop:
-                            "16px",
+                          marginTop: "16px",
                         }}
                       >
                         {[
                           {
                             value: 2,
-                            label:
-                              "賛成",
+                            label: "賛成",
                           },
                           {
                             value: 1,
-                            label:
-                              "やや賛成",
+                            label: "やや賛成",
                           },
                           {
                             value: 0,
-                            label:
-                              "どちらともいえない",
+                            label: "どちらともいえない",
                           },
                           {
                             value: -1,
-                            label:
-                              "やや反対",
+                            label: "やや反対",
                           },
                           {
                             value: -2,
-                            label:
-                              "反対",
+                            label: "反対",
                           },
-                        ].map(
-                          (option) => {
-                            const checked =
-                              answers[
-                                policy
-                                  .id
-                              ] ===
-                              option.value;
+                        ].map((option) => {
+                          const checked =
+                            answers[
+                              policy.id
+                            ] === option.value;
 
-                            return (
-                              <button
-                                key={
+                          return (
+                            <button
+                              key={
+                                option.value
+                              }
+                              onClick={() =>
+                                handleAnswer(
+                                  policy.id,
                                   option.value
-                                }
-                                onClick={() =>
-                                  handleAnswer(
-                                    policy.id,
-                                    option.value
-                                  )
-                                }
-                                style={{
-                                  padding:
-                                    "13px",
-                                  borderRadius:
-                                    "10px",
-                                  border:
-                                    checked
-                                      ? "2px solid #2563eb"
-                                      : "1px solid #d1d5db",
-                                  background:
-                                    checked
-                                      ? "#eff6ff"
-                                      : "#ffffff",
-                                  color:
-                                    "#111827",
-                                  textAlign:
-                                    "left",
-                                  fontSize:
-                                    "15px",
-                                  cursor:
-                                    "pointer",
-                                  fontWeight:
-                                    checked
-                                      ? 700
-                                      : 400,
-                                }}
-                              >
-                                {checked
-                                  ? "✓ "
-                                  : ""}
-                                {
-                                  option.label
-                                }
-                              </button>
-                            );
-                          }
-                        )}
+                                )
+                              }
+                              style={{
+                                padding:
+                                  "13px",
+                                border:
+                                  checked
+                                    ? "2px solid #2563eb"
+                                    : "1px solid #d1d5db",
+                                borderRadius:
+                                  "10px",
+                                background:
+                                  checked
+                                    ? "#eff6ff"
+                                    : "#ffffff",
+                                color:
+                                  "#111827",
+                                textAlign:
+                                  "left",
+                                fontSize:
+                                  "15px",
+                                cursor:
+                                  "pointer",
+                                fontWeight:
+                                  checked
+                                    ? 700
+                                    : 400,
+                              }}
+                            >
+                              {checked
+                                ? "✓ "
+                                : ""}
+                              {
+                                option.label
+                              }
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )
@@ -1150,9 +1168,7 @@ export default function Home() {
               </div>
 
               <button
-                onClick={
-                  finishDiagnosis
-                }
+                onClick={finishDiagnosis}
                 style={{
                   width: "100%",
                   marginTop: "24px",
@@ -1213,54 +1229,48 @@ export default function Home() {
                 <div
                   style={{
                     padding: "18px",
-                    borderRadius:
-                      "12px",
-                    background:
-                      "#fff7ed",
+                    borderRadius: "12px",
+                    background: "#fff7ed",
                     border:
                       "1px solid #fed7aa",
-                    color:
-                      "#9a3412",
+                    color: "#9a3412",
+                    lineHeight: 1.7,
                   }}
                 >
-                  比較できる候補者の政策情報が
-                  まだ十分に登録されていません。
-                  <br />
-                  候補者の政策を登録すると、
-                  一致率を表示できるようになります。
+                  <strong>
+                    比較できる候補者の政策情報がありません。
+                  </strong>
+
+                  <p
+                    style={{
+                      marginBottom: 0,
+                    }}
+                  >
+                    候補者・政策・候補者政策の
+                    紐付けを確認してください。
+                  </p>
                 </div>
               ) : (
                 <div
                   style={{
-                    display:
-                      "grid",
+                    display: "grid",
                     gap: "14px",
-                    marginTop:
-                      "20px",
+                    marginTop: "20px",
                   }}
                 >
                   {diagnosisResults.map(
-                    (
-                      candidate,
-                      index
-                    ) => (
+                    (candidate, index) => (
                       <div
-                        key={
-                          candidate.id
-                        }
+                        key={candidate.id}
                         style={{
-                          padding:
-                            "20px",
-                          borderRadius:
-                            "14px",
+                          padding: "20px",
+                          borderRadius: "14px",
                           border:
-                            index ===
-                            0
+                            index === 0
                               ? "2px solid #2563eb"
                               : "1px solid #e5e7eb",
                           background:
-                            index ===
-                            0
+                            index === 0
                               ? "#eff6ff"
                               : "#f9fafb",
                         }}
@@ -1268,48 +1278,36 @@ export default function Home() {
                         {/* 候補者 */}
                         <div
                           style={{
-                            display:
-                              "flex",
+                            display: "flex",
                             justifyContent:
                               "space-between",
-                            alignItems:
-                              "center",
+                            alignItems: "center",
                             gap: "12px",
                           }}
                         >
                           <div>
                             <div
                               style={{
-                                fontSize:
-                                  "13px",
-                                color:
-                                  "#6b7280",
+                                fontSize: "13px",
+                                color: "#6b7280",
                               }}
                             >
-                              {index +
-                                1}
-                              位
+                              {index + 1}位
                             </div>
 
                             <h3
                               style={{
-                                margin:
-                                  "4px 0",
-                                fontSize:
-                                  "21px",
+                                margin: "4px 0",
+                                fontSize: "21px",
                               }}
                             >
-                              {
-                                candidate.name
-                              }
+                              {candidate.name}
                             </h3>
 
                             <p
                               style={{
-                                margin:
-                                  0,
-                                color:
-                                  "#4b5563",
+                                margin: 0,
+                                color: "#4b5563",
                               }}
                             >
                               {candidate.party ||
@@ -1319,18 +1317,14 @@ export default function Home() {
 
                           <div
                             style={{
-                              textAlign:
-                                "right",
+                              textAlign: "right",
                             }}
                           >
                             <div
                               style={{
-                                fontSize:
-                                  "32px",
-                                fontWeight:
-                                  800,
-                                color:
-                                  "#2563eb",
+                                fontSize: "32px",
+                                fontWeight: 800,
+                                color: "#2563eb",
                               }}
                             >
                               {
@@ -1341,10 +1335,8 @@ export default function Home() {
 
                             <div
                               style={{
-                                fontSize:
-                                  "12px",
-                                color:
-                                  "#6b7280",
+                                fontSize: "12px",
+                                color: "#6b7280",
                               }}
                             >
                               一致率
@@ -1355,12 +1347,9 @@ export default function Home() {
                         {/* 比較件数 */}
                         <p
                           style={{
-                            marginTop:
-                              "14px",
-                            fontSize:
-                              "13px",
-                            color:
-                              "#6b7280",
+                            marginTop: "14px",
+                            fontSize: "13px",
+                            color: "#6b7280",
                           }}
                         >
                           比較できた政策：
@@ -1370,19 +1359,15 @@ export default function Home() {
                           件
                         </p>
 
-                        {/* 一致した政策 */}
+                        {/* 一致 */}
                         {candidate
                           .matchedPolicies
-                          .length >
-                          0 && (
+                          .length > 0 && (
                           <div
                             style={{
-                              marginTop:
-                                "18px",
-                              padding:
-                                "16px",
-                              borderRadius:
-                                "12px",
+                              marginTop: "18px",
+                              padding: "16px",
+                              borderRadius: "12px",
                               background:
                                 "#ecfdf5",
                               border:
@@ -1392,8 +1377,7 @@ export default function Home() {
                             <h4
                               style={{
                                 marginTop: 0,
-                                color:
-                                  "#047857",
+                                color: "#047857",
                               }}
                             >
                               🟢 考えが一致した政策
@@ -1401,23 +1385,18 @@ export default function Home() {
 
                             <div
                               style={{
-                                display:
-                                  "grid",
-                                gap:
-                                  "10px",
+                                display: "grid",
+                                gap: "10px",
                               }}
                             >
                               {candidate.matchedPolicies.map(
-                                (
-                                  policy
-                                ) => (
+                                (policy) => (
                                   <div
                                     key={
                                       policy.id
                                     }
                                     style={{
-                                      padding:
-                                        "12px",
+                                      padding: "12px",
                                       background:
                                         "#ffffff",
                                       borderRadius:
@@ -1472,19 +1451,15 @@ export default function Home() {
                           </div>
                         )}
 
-                        {/* 近い政策 */}
+                        {/* 近い */}
                         {candidate
                           .closePolicies
-                          .length >
-                          0 && (
+                          .length > 0 && (
                           <div
                             style={{
-                              marginTop:
-                                "14px",
-                              padding:
-                                "16px",
-                              borderRadius:
-                                "12px",
+                              marginTop: "14px",
+                              padding: "16px",
+                              borderRadius: "12px",
                               background:
                                 "#fffbeb",
                               border:
@@ -1494,8 +1469,7 @@ export default function Home() {
                             <h4
                               style={{
                                 marginTop: 0,
-                                color:
-                                  "#92400e",
+                                color: "#92400e",
                               }}
                             >
                               🟡 考えが近い政策
@@ -1503,23 +1477,18 @@ export default function Home() {
 
                             <div
                               style={{
-                                display:
-                                  "grid",
-                                gap:
-                                  "10px",
+                                display: "grid",
+                                gap: "10px",
                               }}
                             >
                               {candidate.closePolicies.map(
-                                (
-                                  policy
-                                ) => (
+                                (policy) => (
                                   <div
                                     key={
                                       policy.id
                                     }
                                     style={{
-                                      padding:
-                                        "12px",
+                                      padding: "12px",
                                       background:
                                         "#ffffff",
                                       borderRadius:
@@ -1563,19 +1532,15 @@ export default function Home() {
                           </div>
                         )}
 
-                        {/* 意見が異なる政策 */}
+                        {/* 異なる */}
                         {candidate
                           .differentPolicies
-                          .length >
-                          0 && (
+                          .length > 0 && (
                           <div
                             style={{
-                              marginTop:
-                                "14px",
-                              padding:
-                                "16px",
-                              borderRadius:
-                                "12px",
+                              marginTop: "14px",
+                              padding: "16px",
+                              borderRadius: "12px",
                               background:
                                 "#fef2f2",
                               border:
@@ -1585,8 +1550,7 @@ export default function Home() {
                             <h4
                               style={{
                                 marginTop: 0,
-                                color:
-                                  "#b91c1c",
+                                color: "#b91c1c",
                               }}
                             >
                               🔴 考えが異なる政策
@@ -1594,23 +1558,18 @@ export default function Home() {
 
                             <div
                               style={{
-                                display:
-                                  "grid",
-                                gap:
-                                  "10px",
+                                display: "grid",
+                                gap: "10px",
                               }}
                             >
                               {candidate.differentPolicies.map(
-                                (
-                                  policy
-                                ) => (
+                                (policy) => (
                                   <div
                                     key={
                                       policy.id
                                     }
                                     style={{
-                                      padding:
-                                        "12px",
+                                      padding: "12px",
                                       background:
                                         "#ffffff",
                                       borderRadius:
@@ -1660,9 +1619,7 @@ export default function Home() {
               )}
 
               <button
-                onClick={
-                  restartDiagnosis
-                }
+                onClick={restartDiagnosis}
                 style={{
                   width: "100%",
                   marginTop: "20px",
@@ -1670,8 +1627,7 @@ export default function Home() {
                   border:
                     "1px solid #d1d5db",
                   borderRadius: "10px",
-                  background:
-                    "#ffffff",
+                  background: "#ffffff",
                   color: "#111827",
                   fontSize: "15px",
                   cursor: "pointer",
@@ -1683,53 +1639,6 @@ export default function Home() {
           )}
 
         {/* =========================
-            ローディング
-        ========================= */}
-        {loading && (
-          <section
-            style={{
-              background: "#ffffff",
-              border:
-                "1px solid #e5e7eb",
-              borderRadius: "16px",
-              padding: "24px",
-            }}
-          >
-            <p style={{ margin: 0 }}>
-              情報を読み込んでいます…
-            </p>
-          </section>
-        )}
-
-        {/* =========================
-            エラー
-        ========================= */}
-        {error && (
-          <section
-            style={{
-              padding: "18px",
-              borderRadius: "12px",
-              background: "#fef2f2",
-              border:
-                "1px solid #fecaca",
-              color: "#b91c1c",
-            }}
-          >
-            <strong>
-              データ取得エラー
-            </strong>
-
-            <p
-              style={{
-                marginBottom: 0,
-              }}
-            >
-              {error}
-            </p>
-          </section>
-        )}
-
-        {/* =========================
             候補者一覧
         ========================= */}
         {!loading &&
@@ -1739,22 +1648,18 @@ export default function Home() {
             <>
               <section
                 style={{
-                  background:
-                    "#ffffff",
+                  background: "#ffffff",
                   border:
                     "1px solid #e5e7eb",
-                  borderRadius:
-                    "16px",
+                  borderRadius: "16px",
                   padding: "20px",
-                  marginBottom:
-                    "24px",
+                  marginBottom: "24px",
                 }}
               >
                 <h2
                   style={{
                     marginTop: 0,
-                    fontSize:
-                      "22px",
+                    fontSize: "22px",
                   }}
                 >
                   {selectedElectionData
@@ -1764,10 +1669,8 @@ export default function Home() {
 
                 <p
                   style={{
-                    color:
-                      "#6b7280",
-                    fontSize:
-                      "14px",
+                    color: "#6b7280",
+                    fontSize: "14px",
                   }}
                 >
                   {selectedElection
@@ -1779,30 +1682,22 @@ export default function Home() {
                   type="text"
                   value={search}
                   onChange={(e) =>
-                    setSearch(
-                      e.target.value
-                    )
+                    setSearch(e.target.value)
                   }
                   placeholder="候補者名・政党・プロフィールから検索"
                   style={{
                     width: "100%",
-                    boxSizing:
-                      "border-box",
-                    padding:
-                      "13px 14px",
+                    boxSizing: "border-box",
+                    padding: "13px 14px",
                     border:
                       "1px solid #d1d5db",
-                    borderRadius:
-                      "10px",
-                    fontSize:
-                      "15px",
+                    borderRadius: "10px",
+                    fontSize: "15px",
                   }}
                 />
 
                 <select
-                  value={
-                    selectedParty
-                  }
+                  value={selectedParty}
                   onChange={(e) =>
                     setSelectedParty(
                       e.target.value
@@ -1810,35 +1705,25 @@ export default function Home() {
                   }
                   style={{
                     width: "100%",
-                    marginTop:
-                      "12px",
-                    padding:
-                      "12px",
+                    marginTop: "12px",
+                    padding: "12px",
                     border:
                       "1px solid #d1d5db",
-                    borderRadius:
-                      "10px",
-                    background:
-                      "#ffffff",
-                    fontSize:
-                      "15px",
+                    borderRadius: "10px",
+                    background: "#ffffff",
+                    fontSize: "15px",
                   }}
                 >
-                  {parties.map(
-                    (party) => (
-                      <option
-                        key={party}
-                        value={
-                          party
-                        }
-                      >
-                        {party ===
-                        "すべて"
-                          ? "すべての政党・所属"
-                          : party}
-                      </option>
-                    )
-                  )}
+                  {parties.map((party) => (
+                    <option
+                      key={party}
+                      value={party}
+                    >
+                      {party === "すべて"
+                        ? "すべての政党・所属"
+                        : party}
+                    </option>
+                  ))}
                 </select>
               </section>
 
@@ -1846,33 +1731,27 @@ export default function Home() {
                 0 && (
                 <section
                   style={{
-                    background:
-                      "#ffffff",
+                    background: "#ffffff",
                     border:
                       "1px solid #e5e7eb",
-                    borderRadius:
-                      "16px",
-                    padding:
-                      "24px",
+                    borderRadius: "16px",
+                    padding: "24px",
                   }}
                 >
                   <p
                     style={{
                       margin: 0,
-                      color:
-                        "#6b7280",
+                      color: "#6b7280",
                     }}
                   >
-                    条件に一致する候補者が
-                    ありません。
+                    条件に一致する候補者がありません。
                   </p>
                 </section>
               )}
 
               <div
                 style={{
-                  display:
-                    "grid",
+                  display: "grid",
                   gap: "18px",
                 }}
               >
@@ -1885,39 +1764,31 @@ export default function Home() {
 
                     return (
                       <article
-                        key={
-                          candidate.id
-                        }
+                        key={candidate.id}
                         style={{
-                          background:
-                            "#ffffff",
+                          background: "#ffffff",
                           border:
                             "1px solid #e5e7eb",
-                          borderRadius:
-                            "16px",
-                          padding:
-                            "22px",
+                          borderRadius: "16px",
+                          padding: "22px",
                         }}
                       >
                         <div
                           style={{
-                            display:
-                              "flex",
+                            display: "flex",
                             justifyContent:
                               "space-between",
                             alignItems:
                               "flex-start",
                             gap: "16px",
-                            flexWrap:
-                              "wrap",
+                            flexWrap: "wrap",
                           }}
                         >
                           <div>
                             <h3
                               style={{
                                 margin: 0,
-                                fontSize:
-                                  "24px",
+                                fontSize: "24px",
                               }}
                             >
                               {candidate.name ||
@@ -1926,18 +1797,14 @@ export default function Home() {
 
                             <p
                               style={{
-                                marginTop:
-                                  "8px",
-                                marginBottom:
-                                  0,
-                                color:
-                                  "#4b5563",
+                                marginTop: "8px",
+                                marginBottom: 0,
+                                color: "#4b5563",
                               }}
                             >
                               <strong>
                                 所属：
-                              </strong>
-
+                              </strong>{" "}
                               {candidate.party ||
                                 "未登録"}
                             </p>
@@ -1970,12 +1837,11 @@ export default function Home() {
                           )}
                         </div>
 
+                        {/* プロフィール */}
                         <div
                           style={{
-                            marginTop:
-                              "22px",
-                            paddingTop:
-                              "18px",
+                            marginTop: "22px",
+                            paddingTop: "18px",
                             borderTop:
                               "1px solid #f0f0f0",
                           }}
@@ -1986,12 +1852,10 @@ export default function Home() {
 
                           <p
                             style={{
-                              lineHeight:
-                                1.8,
+                              lineHeight: 1.8,
                               whiteSpace:
                                 "pre-wrap",
-                              color:
-                                "#374151",
+                              color: "#374151",
                             }}
                           >
                             {candidate.profile ||
@@ -1999,10 +1863,10 @@ export default function Home() {
                           </p>
                         </div>
 
+                        {/* 政策 */}
                         <div
                           style={{
-                            marginTop:
-                              "24px",
+                            marginTop: "24px",
                           }}
                         >
                           <h4>
@@ -2024,8 +1888,7 @@ export default function Home() {
                               style={{
                                 display:
                                   "grid",
-                                gap:
-                                  "12px",
+                                gap: "12px",
                               }}
                             >
                               {candidatePolicyList.map(
@@ -2115,20 +1978,16 @@ export default function Home() {
                           )}
                         </div>
 
+                        {/* 診断ボタン */}
                         <div
                           style={{
-                            marginTop:
-                              "22px",
-                            padding:
-                              "18px",
-                            borderRadius:
-                              "12px",
-                            background:
-                              "#eff6ff",
+                            marginTop: "22px",
+                            padding: "18px",
+                            borderRadius: "12px",
+                            background: "#eff6ff",
                             border:
                               "1px solid #bfdbfe",
-                            textAlign:
-                              "center",
+                            textAlign: "center",
                           }}
                         >
                           <strong>
@@ -2137,14 +1996,11 @@ export default function Home() {
 
                           <p
                             style={{
-                              marginTop:
-                                "7px",
+                              marginTop: "7px",
                               marginBottom:
                                 "12px",
-                              fontSize:
-                                "14px",
-                              color:
-                                "#4b5563",
+                              fontSize: "14px",
+                              color: "#4b5563",
                             }}
                           >
                             政策診断に回答すると、
@@ -2161,8 +2017,7 @@ export default function Home() {
                               style={{
                                 padding:
                                   "10px 18px",
-                                border:
-                                  "none",
+                                border: "none",
                                 borderRadius:
                                   "8px",
                                 background:
@@ -2185,8 +2040,7 @@ export default function Home() {
                               style={{
                                 padding:
                                   "10px 18px",
-                                border:
-                                  "none",
+                                border: "none",
                                 borderRadius:
                                   "8px",
                                 background:
