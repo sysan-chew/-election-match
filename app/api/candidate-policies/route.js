@@ -1,34 +1,44 @@
 import { createClient } from "@supabase/supabase-js";
 
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
 export async function GET() {
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-  );
+  try {
+    const { data, error } = await supabase
+      .from("candidate_policies")
+      .select("*")
+      .order("id", { ascending: true });
 
-  const { data, error } = await supabase
-    .from("candidate_policies")
-    .select(
-      "id, candidate_id, policy_id, position, stance, source_url, created_at"
-    )
-    .order("id", { ascending: true });
+    if (error) {
+      console.error("candidate_policies error:", error);
 
-  if (error) {
-    console.error("Supabase candidate_policies error:", error);
+      return Response.json(
+        {
+          error: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({
+      candidatePolicies: data || [],
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
 
     return Response.json(
       {
-        candidatePolicies: [],
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
+        error:
+          error.message ||
+          "候補者政策データの取得に失敗しました",
       },
       { status: 500 }
     );
   }
-
-  return Response.json({
-    candidatePolicies: data || [],
-  });
 }
